@@ -1,12 +1,13 @@
 import math
 
 from distributions import (
-    standard_normal_curve, t_curve, probability_below, probability_above, critical_value,
+    normal_curve, t_curve, probability_below, probability_above, critical_value,
 )
 
 CHART_POINTS = 200
 COMMON_CONFIDENCES = [90, 95, 98, 99]
 MAX_SCORE = 1000
+MAX_WHOLE = 10**9
 
 
 def fmt(value):
@@ -26,6 +27,8 @@ def read_number(data, name, label, minimum=None, maximum=None, whole=False, posi
         if value != int(value):
             raise ValueError(f"{label}: debe ser un número entero.")
         value = int(value)
+        if maximum is None:
+            maximum = MAX_WHOLE
     if positive and value <= 0:
         raise ValueError(f"{label}: debe ser mayor que 0.")
     if minimum is not None and value < minimum:
@@ -66,10 +69,13 @@ def values_table(rows):
 
 
 def make_chart(curve, axis, shaded, marks):
-    limit = min(max(4, math.ceil(max([abs(m) for m in marks], default=0) + 1)), 8)
+    # El eje va de -limit a limit: lo justo para ver las marcas, entre 4 y 8
+    farthest = max(abs(mark) for mark in marks)
+    limit = min(max(4, math.ceil(farthest + 1)), 8)
     grid = [-limit + 2 * limit * i / CHART_POINTS for i in range(CHART_POINTS + 1)]
-    edges = [m for m in marks if abs(m) <= limit]
-    xs = sorted(set(grid + edges))
+    # Las marcas se agregan como puntos para que el área sombreada empiece justo en ellas
+    visible_marks = [mark for mark in marks if abs(mark) <= limit]
+    xs = sorted(set(grid + visible_marks))
     return {
         "axis": axis,
         "limit": limit,
@@ -90,7 +96,8 @@ def proportion_notes(samples):
     return []
 
 
-def interval_result(symbol, estimate, standard_error, critical, confidence, curve, axis, inputs):
+def interval_result(symbol, estimate, standard_error, critical, confidence, curve, axis, inputs,
+                    notes=()):
     margin = critical * standard_error
     lower = estimate - margin
     upper = estimate + margin
@@ -106,7 +113,7 @@ def interval_result(symbol, estimate, standard_error, critical, confidence, curv
                   f"({fmt(lower)} , {fmt(upper)})",
         "tables": [values_table(rows)],
         "chart": make_chart(curve, axis, [[-critical, critical]], [-critical, critical]),
-        "notes": [],
+        "notes": list(notes),
     }
 
 
@@ -154,11 +161,10 @@ def critical_value_result(curve, axis, data, rows):
         ("Colas", "Dos colas" if tails == "two" else "Una cola"),
         ("Valor crítico", critical),
     ]
-    common_rows = [
-        [f"{level}%", fmt(critical_value(curve, 1 - (1 - level / 100) / 2)),
-         fmt(critical_value(curve, level / 100))]
-        for level in COMMON_CONFIDENCES
-    ]
+    common_rows = []
+    for level in COMMON_CONFIDENCES:
+        common_rows.append([f"{level}%", fmt(two_sided_critical(curve, level / 100)),
+                            fmt(critical_value(curve, level / 100))])
     return {
         "answer": answer,
         "tables": [
@@ -179,11 +185,11 @@ def z_mean_interval(data):
     sigma = read_number(data, "sigma", "Desviación estándar poblacional (σ)", positive=True)
     n = read_number(data, "n", "Tamaño de muestra (n)", minimum=1, whole=True)
     confidence = read_confidence(data)
-    curve = standard_normal_curve()
-    critical = two_sided_critical(curve, confidence)
+    critical = two_sided_critical(normal_curve, confidence)
     inputs = [("Media muestral (x̄)", mean), ("Desviación poblacional (σ)", sigma),
               ("Tamaño de muestra (n)", n)]
-    return interval_result("μ", mean, sigma / math.sqrt(n), critical, confidence, curve, "Z", inputs)
+    return interval_result("μ", mean, sigma / math.sqrt(n), critical, confidence,
+                           normal_curve, "Z", inputs)
 
 
 def z_one_proportion(data):
@@ -191,13 +197,11 @@ def z_one_proportion(data):
     successes = read_number(data, "successes", "Éxitos (x)", minimum=0, maximum=n, whole=True)
     confidence = read_confidence(data)
     p = successes / n
-    curve = standard_normal_curve()
-    critical = two_sided_critical(curve, confidence)
+    critical = two_sided_critical(normal_curve, confidence)
     inputs = [("Tamaño de muestra (n)", n), ("Éxitos (x)", successes), ("Proporción muestral (p̂)", p)]
-    result = interval_result("p", p, math.sqrt(p * (1 - p) / n), critical, confidence,
-                             curve, "Z", inputs)
-    result["notes"] = proportion_notes([(successes, n)])
-    return result
+    notes = proportion_notes([(successes, n)])
+    return interval_result("p", p, math.sqrt(p * (1 - p) / n), critical, confidence,
+                           normal_curve, "Z", inputs, notes)
 
 
 def z_two_proportions(data):
@@ -210,15 +214,13 @@ def z_two_proportions(data):
     confidence = read_confidence(data)
     p1 = successes1 / n1
     p2 = successes2 / n2
-    curve = standard_normal_curve()
-    critical = two_sided_critical(curve, confidence)
+    critical = two_sided_critical(normal_curve, confidence)
     standard_error = math.sqrt(p1 * (1 - p1) / n1 + p2 * (1 - p2) / n2)
     inputs = [("Proporción muestra 1 (p̂₁)", p1), ("Proporción muestra 2 (p̂₂)", p2),
               ("Diferencia (p̂₁ − p̂₂)", p1 - p2)]
-    result = interval_result("p₁ − p₂", p1 - p2, standard_error, critical, confidence,
-                             curve, "Z", inputs)
-    result["notes"] = proportion_notes([(successes1, n1), (successes2, n2)])
-    return result
+    notes = proportion_notes([(successes1, n1), (successes2, n2)])
+    return interval_result("p₁ − p₂", p1 - p2, standard_error, critical, confidence,
+                           normal_curve, "Z", inputs, notes)
 
 
 def z_probability(data):
@@ -231,11 +233,11 @@ def z_probability(data):
     scores = [standardize(value, mean, std_dev) for value in values]
     rows = [("Media (μ)", mean), ("Desviación estándar (σ)", std_dev)]
     rows += [(f"Valor Z {i + 1}", score) for i, score in enumerate(scores)]
-    return probability_result(standard_normal_curve(), "Z", "X", tail, values, scores, rows)
+    return probability_result(normal_curve, "Z", "X", tail, values, scores, rows)
 
 
 def z_critical_value(data):
-    return critical_value_result(standard_normal_curve(), "Z", data, [])
+    return critical_value_result(normal_curve, "Z", data, [])
 
 
 def t_mean_interval(data):

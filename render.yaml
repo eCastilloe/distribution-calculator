@@ -1,0 +1,8 @@
+services:
+  - type: web
+    name: distribution-calculator
+    runtime: python
+    plan: free
+    healthCheckPath: /health
+    buildCommand: pip install -r requirements.txt
+    startCommand: python server.py

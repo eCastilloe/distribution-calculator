@@ -260,11 +260,12 @@ function drawChart(canvas, chart) {
     context.fill();
   }
 
+  const [firstX, firstY] = chart.points[0];
   context.beginPath();
-  chart.points.forEach(([x, y], index) => {
-    if (index === 0) context.moveTo(toX(x), toY(y));
-    else context.lineTo(toX(x), toY(y));
-  });
+  context.moveTo(toX(firstX), toY(firstY));
+  for (const [x, y] of chart.points) {
+    context.lineTo(toX(x), toY(y));
+  }
   context.strokeStyle = accent;
   context.lineWidth = 2;
   context.stroke();
@@ -285,13 +286,13 @@ function drawChart(canvas, chart) {
   context.fillText(chart.axis, left + plotWidth / 2, height - 3);
 
   context.fillStyle = textColor;
+  context.strokeStyle = textColor;
   context.setLineDash([4, 3]);
   for (const mark of chart.marks) {
     if (Math.abs(mark) > chart.limit) continue;
     context.beginPath();
     context.moveTo(toX(mark), top - 4);
     context.lineTo(toX(mark), toY(0));
-    context.strokeStyle = textColor;
     context.stroke();
     context.fillText(mark.toFixed(2), toX(mark), top - 8);
   }
