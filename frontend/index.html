@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Calculadora de distribuciones Z y t</title>
+  <title>Calculadora de distribuciones Z, t, χ² y F</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <header>
-    <h1>Calculadora de distribuciones Z y t</h1>
+    <h1>Calculadora de distribuciones Z, t, χ² y F</h1>
     <p>Elige la distribución, el tipo de problema y escribe tus datos.</p>
   </header>
 
@@ -25,6 +25,14 @@
           <input type="radio" name="distribution" value="t">
           <span>t <small>Student</small></span>
         </label>
+        <label class="choice-option">
+          <input type="radio" name="distribution" value="chi2">
+          <span>χ² <small>Chi cuadrada</small></span>
+        </label>
+        <label class="choice-option">
+          <input type="radio" name="distribution" value="f">
+          <span>F <small>Fisher</small></span>
+        </label>
       </div>
       <p id="distribution-hint" class="hint"></p>
 
@@ -32,6 +40,7 @@
         <span>¿Qué quieres calcular?</span>
         <select id="problem"></select>
       </label>
+      <p id="problem-hint" class="hint"></p>
 
       <form id="form" novalidate>
         <div id="fields"></div>

@@ -1,4 +1,4 @@
-# Calculadora de distribuciones Z y t
+# Calculadora de distribuciones Z, t, χ² y F
 
 Programa con interfaz web y backend en Python. No usa librerías externas: solo la biblioteca estándar.
 
@@ -21,12 +21,18 @@ Windows puede mostrar una advertencia de "aplicación no reconocida" porque el e
 
 ## Qué calcula
 
+Todos los intervalos del formulario del parcial:
+
 | Distribución | Problemas |
 |---|---|
-| Z (normal) | Intervalo para una media (σ conocida), una proporción y dos proporciones; probabilidades; valor crítico |
-| t de Student | Intervalo para una media (σ desconocida); probabilidades; valor crítico |
+| Z (normal) | Intervalo para una media (σ conocida o n ≥ 30), dos medias, una proporción y dos proporciones; tamaño de muestra (media o proporción) |
+| t de Student | Intervalo para una media (σ desconocida), dos medias (varianzas iguales o diferentes) y muestras pareadas |
+| χ² (chi cuadrada) | Intervalo para una varianza (y para σ) |
+| F de Fisher | Intervalo para el cociente de dos varianzas |
 
-Cada resultado incluye la respuesta, la gráfica de la curva con el área correspondiente y una tabla con los valores del cálculo.
+Las cuatro distribuciones también calculan probabilidades (menor, mayor o entre dos valores) y valores críticos (una o dos colas, con tabla de los niveles más usados).
+
+Cada resultado incluye la respuesta, la gráfica de la curva con el área correspondiente, una tabla con los valores del cálculo y, en las comparaciones de dos poblaciones, el criterio de decisión.
 
 ## Estructura
 
@@ -34,15 +40,18 @@ Cada resultado incluye la respuesta, la gráfica de la curva con el área corres
     desktop.py           Arranque local: abre el navegador solo (se usa para el ejecutable)
     build_exe.bat / .sh  Generan el ejecutable con PyInstaller
     problems.py          Validación de datos y cálculo de cada tipo de problema
-    distributions.py     Curvas Z y t, área bajo la curva, probabilidad y valor crítico
+    distributions.py     Curvas Z, t, χ² y F; área bajo la curva, probabilidad y valor crítico
     frontend/            Interfaz (index.html, style.css, app.js)
+    tests/               Pruebas automáticas (python -m unittest discover tests)
     render.yaml          Configuración para publicar en Render
 
 ## Método
 
 - La probabilidad es el área bajo la curva de la distribución, calculada con la regla de Simpson.
-- El valor crítico se obtiene por bisección sobre esa probabilidad.
-- Se usa `math.lgamma` de la biblioteca estándar para la constante de la curva t.
+- Para poder sumar el área desde 0 aunque la curva sea infinita ahí (χ² con 1 gl, F con ν₁ = 1), se usa el cambio de variable x = u⁴; lejos del centro, x = 10·eˢ.
+- El valor crítico se obtiene por búsqueda binaria sobre esa probabilidad.
+- Se usa `math.lgamma` de la biblioteca estándar para las constantes de las curvas t, χ² y F.
+- Los grados de libertad de dos medias con varianzas diferentes (fórmula de Welch) no se redondean.
 
 ## Publicar en Render con un dominio propio
 
