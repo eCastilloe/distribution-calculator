@@ -1,5 +1,6 @@
 """Pruebas del cálculo. Ejecutar desde la carpeta del proyecto con:  python -m unittest discover tests"""
 import math
+import statistics
 import unittest
 
 from distributions import NORMAL, student_t, chi_square, fisher_f
@@ -8,6 +9,13 @@ from problems import solve
 
 def answer(**data):
     return solve(data)["answer"]
+
+
+def limits(**data):
+    """Los dos límites del intervalo, leídos del texto de la respuesta "… (a , b)"."""
+    text = answer(**data)
+    lower, upper = text[text.index("(") + 1:text.index(")")].split(" , ")
+    return float(lower), float(upper)
 
 
 class CriticalValuesTest(unittest.TestCase):
@@ -42,14 +50,14 @@ class IntervalsTest(unittest.TestCase):
 
     def test_one_mean(self):
         self.assertIn("(48.0400 , 51.9600)", answer(distribution="z", problem="mean_interval",
-                                                     sample_mean=50, std_dev=8, n=64, confidence=95))
+                                                     mean=50, std_dev=8, n=64, confidence=95))
         self.assertIn("(44.2771 , 55.7229)", answer(distribution="t", problem="mean_interval",
-                                                     sample_mean=50, std_dev=8, n=10, confidence=95))
+                                                     mean=50, std_dev=8, n=10, confidence=95))
 
     def test_paired(self):
         # 2.5 ± t(0.025, 11) · 3 / √12 = 2.5 ± 2.2010 · 0.8660
         self.assertIn("(0.5939 , 4.4061)", answer(distribution="t", problem="paired",
-                                                   sample_mean=2.5, std_dev=3, n=12, confidence=95))
+                                                   mean=2.5, std_dev=3, n=12, confidence=95))
 
     def test_proportions(self):
         self.assertIn("(0.3525 , 0.5475)", answer(distribution="z", problem="one_proportion",
@@ -72,11 +80,11 @@ class IntervalsTest(unittest.TestCase):
     def test_one_variance(self):
         # (9 · 4 / 19.0228 , 9 · 4 / 2.7004)
         self.assertIn("(1.8925 , 13.3314)", answer(distribution="chi2", problem="variance_interval",
-                                                    n=10, variance=4, confidence=95))
+                                                    input_mode="variance", n=10, variance=4, confidence=95))
 
     def test_variance_ratio(self):
         # (2.25 / F(5, 10) , 2.25 · F(10, 5)) = (2.25 / 4.2361 , 2.25 · 6.6192)
-        self.assertIn("(0.5312 , 14.8931)", answer(distribution="f", problem="variance_ratio",
+        self.assertIn("(0.5312 , 14.8931)", answer(distribution="f", problem="variance_ratio", input_mode="variance",
                                                     n1=6, variance1=9, n2=11, variance2=4, confidence=95))
 
     def test_sample_size(self):
@@ -99,17 +107,96 @@ class ProbabilityTest(unittest.TestCase):
                                        tail="between", x=1, x2=19))
 
 
+class ExamProblemsTest(unittest.TestCase):
+    # Ejercicios del documento "2do Parcial". La media y la varianza esperadas se calculan
+    # con el módulo statistics (solo en las pruebas) y los valores críticos vienen de tablas.
+
+    def test_claimed_mean(self):
+        # Ejercicio 1: 320 ± 1.96 · 40 / 8; la afirmación μ = 300 queda fuera
+        result = solve(dict(distribution="z", problem="mean_interval", mean=320, std_dev=40, n=64,
+                            confidence=95, claimed=300))
+        self.assertIn("(310.2002 , 329.7998)", result["answer"])
+        self.assertIn("se rechaza H₀", result["interpretation"])
+        result = solve(dict(distribution="z", problem="one_proportion", n=500, successes=390,
+                            confidence=95, claimed=0.8))
+        self.assertIn("no se rechaza H₀", result["interpretation"])
+
+    def test_variance_from_data(self):
+        # Intervalos de varianzas, ejercicio 1: (9 s² / 19.0228 , 9 s² / 2.7004)
+        sales = [12.4, 13.0, 11.8, 14.2, 12.1, 12.5, 13.1, 11.9, 12.8, 14.1]
+        variance = statistics.variance(sales)
+        lower, upper = limits(distribution="chi2", problem="variance_interval", input_mode="data",
+                              values="12.4, 13.0, 11.8, 14.2, 12.1, 12.5, 13.1, 11.9, 12.8, 14.1",
+                              confidence=95)
+        self.assertAlmostEqual(lower, 9 * variance / 19.0228, places=3)
+        self.assertAlmostEqual(upper, 9 * variance / 2.7004, places=3)
+
+    def test_variance_from_std_dev(self):
+        # Repaso 8: s = 2.8, n = 25, 80%: (24 · 7.84 / 33.1963 , 24 · 7.84 / 15.6587)
+        lower, upper = limits(distribution="chi2", problem="variance_interval", input_mode="std_dev",
+                              std_dev=2.8, n=25, confidence=80)
+        self.assertAlmostEqual(lower, 24 * 7.84 / 33.1963, places=3)
+        self.assertAlmostEqual(upper, 24 * 7.84 / 15.6587, places=3)
+
+    def test_mean_from_data(self):
+        # Repaso 2 (pH): x̄ ± t(0.05, 9) · s / √10, con t = 1.8331
+        ph = [6.2, 6.5, 6.1, 6.4, 6.3, 6.0, 6.2, 6.5, 6.3, 6.1]
+        margin = 1.8331 * statistics.stdev(ph) / math.sqrt(10)
+        lower, upper = limits(distribution="t", problem="mean_interval", input_mode="data",
+                              values="6.2 6.5 6.1 6.4 6.3 6.0 6.2 6.5 6.3 6.1", confidence=90)
+        self.assertAlmostEqual(lower, statistics.mean(ph) - margin, places=3)
+        self.assertAlmostEqual(upper, statistics.mean(ph) + margin, places=3)
+
+    def test_paired_columns(self):
+        # Pareadas, problema 2: d = antes − después; d̄ ± t(0.005, 9) · s_d / √10, con t = 3.2498
+        before = [50, 45, 60, 55, 50, 48, 52, 57, 53, 49]
+        after = [65, 55, 75, 70, 60, 58, 67, 72, 68, 59]
+        differences = [b - a for b, a in zip(before, after)]
+        margin = 3.2498 * statistics.stdev(differences) / math.sqrt(10)
+        lower, upper = limits(distribution="t", problem="paired", input_mode="pairs",
+                              values1="50 45 60 55 50 48 52 57 53 49",
+                              values2="65 55 75 70 60 58 67 72 68 59", confidence=99)
+        self.assertAlmostEqual(lower, statistics.mean(differences) - margin, places=3)
+        self.assertAlmostEqual(upper, statistics.mean(differences) + margin, places=3)
+
+    def test_percent_lists(self):
+        # Intervalos de 2 varianzas, ejercicio 2: listas entre corchetes y con %
+        p1 = [1.3, 1.4, 1.2, 1.3, 1.5, 1.3, 1.2, 1.4, 1.5]
+        p2 = [1.1, 1.0, 1.2, 1.1, 1.2, 1.0, 1.2]
+        ratio = statistics.variance(p1) / statistics.variance(p2)
+        result = solve(dict(distribution="f", problem="variance_ratio", input_mode="data",
+                            values1="[1.3%, 1.4%, 1.2%, 1.3%, 1.5%, 1.3%, 1.2%, 1.4%, 1.5%]",
+                            values2="[1.1%, 1.0%, 1.2%, 1.1%, 1.2%, 1.0%, 1.2%]", confidence=95))
+        # (cociente / F(8, 6) , cociente · F(6, 8)) = (cociente / 5.5996 , cociente · 4.6517)
+        self.assertIn(f"({ratio / 5.5996:.4f} , ", result["answer"])
+        self.assertIn("no son significativamente diferentes", result["interpretation"])
+
+
 class ValidationTest(unittest.TestCase):
 
     def test_errors(self):
         with self.assertRaisesRegex(ValueError, "al menos 2"):
-            solve(dict(distribution="t", problem="mean_interval", sample_mean=5, std_dev=1, n=1,
+            solve(dict(distribution="t", problem="mean_interval", mean=5, std_dev=1, n=1,
                        confidence=95))
         with self.assertRaisesRegex(ValueError, "escribe un número"):
-            solve(dict(distribution="chi2", problem="variance_interval", n=10, variance="abc",
+            solve(dict(distribution="chi2", problem="variance_interval", input_mode="variance", n=10,
+                       variance="abc",
                        confidence=95))
         with self.assertRaisesRegex(ValueError, "Elige una distribución"):
             solve(dict(distribution="chi2", problem="two_means"))
+        with self.assertRaisesRegex(ValueError, "Elige una distribución"):
+            solve(dict(distribution="z", problem="critical_value"))
+
+    def test_data_errors(self):
+        with self.assertRaisesRegex(ValueError, "misma cantidad"):
+            solve(dict(distribution="t", problem="paired", input_mode="pairs", values1="1 2 3",
+                       values2="1 2", confidence=95))
+        with self.assertRaisesRegex(ValueError, "no es un número"):
+            solve(dict(distribution="t", problem="mean_interval", input_mode="data",
+                       values="5 abc 7", confidence=95))
+        with self.assertRaisesRegex(ValueError, "todos los datos son iguales"):
+            solve(dict(distribution="t", problem="mean_interval", input_mode="data",
+                       values="5, 5, 5", confidence=95))
 
 
 if __name__ == "__main__":

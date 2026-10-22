@@ -30,9 +30,21 @@ Todos los intervalos del formulario del parcial:
 | χ² (chi cuadrada) | Intervalo para una varianza (y para σ) |
 | F de Fisher | Intervalo para el cociente de dos varianzas |
 
-Las cuatro distribuciones también calculan probabilidades (menor, mayor o entre dos valores) y valores críticos (una o dos colas, con tabla de los niveles más usados).
+Las cuatro distribuciones también calculan probabilidades (menor, mayor o entre dos valores).
 
-Cada resultado incluye la respuesta, la gráfica de la curva con el área correspondiente, una tabla con los valores del cálculo y, en las comparaciones de dos poblaciones, el criterio de decisión.
+Cómo se capturan los datos:
+
+- **Resumen o lista de datos.** En medias, varianzas y cocientes de varianzas se puede escribir el resumen (x̄, s, n o s²) o pegar la lista de datos tal como viene en el problema. Los valores se separan con comas o espacios, se usa punto decimal, y el símbolo %, el $ y los corchetes se ignoran. El programa calcula la media, la desviación estándar (dividiendo entre n − 1) y n.
+- **Muestras pareadas.** Se pegan las dos columnas (por ejemplo, antes y después) y el programa resta cada par.
+- **Afirmaciones.** Si el problema afirma un valor ("el promedio es 300 ms"), se escribe en «Valor afirmado» y el resultado plantea H₀ y H₁ y dice si se rechaza H₀.
+
+Cada resultado incluye:
+- la respuesta;
+- una interpretación corta en palabras;
+- la gráfica de la curva con el área correspondiente;
+- una tabla con los valores del cálculo.
+
+En las comparaciones de dos poblaciones se agrega el criterio de decisión del formulario (por ejemplo, si las varianzas son significativamente diferentes).
 
 ## Estructura
 
@@ -40,7 +52,7 @@ Cada resultado incluye la respuesta, la gráfica de la curva con el área corres
     desktop.py           Arranque local: abre el navegador solo (se usa para el ejecutable)
     build_exe.bat / .sh  Generan el ejecutable con PyInstaller
     problems.py          Validación de datos y cálculo de cada tipo de problema
-    distributions.py     Curvas Z, t, χ² y F; área bajo la curva, probabilidad y valor crítico
+    distributions.py     Curvas Z, t, χ² y F; área bajo la curva, probabilidad y valores críticos
     frontend/            Interfaz (index.html, style.css, app.js)
     tests/               Pruebas automáticas (python -m unittest discover tests)
     render.yaml          Configuración para publicar en Render
@@ -49,7 +61,7 @@ Cada resultado incluye la respuesta, la gráfica de la curva con el área corres
 
 - La probabilidad es el área bajo la curva de la distribución, calculada con la regla de Simpson.
 - Para poder sumar el área desde 0 aunque la curva sea infinita ahí (χ² con 1 gl, F con ν₁ = 1), se usa el cambio de variable x = u⁴; lejos del centro, x = 10·eˢ.
-- El valor crítico se obtiene por búsqueda binaria sobre esa probabilidad.
+- Los valores críticos de cada intervalo se obtienen por búsqueda binaria sobre esa probabilidad.
 - Se usa `math.lgamma` de la biblioteca estándar para las constantes de las curvas t, χ² y F.
 - Los grados de libertad de dos medias con varianzas diferentes (fórmula de Welch) no se redondean.
 

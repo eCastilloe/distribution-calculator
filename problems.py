@@ -3,11 +3,22 @@ import math
 from distributions import NORMAL, student_t, chi_square, fisher_f
 
 CHART_POINTS = 200
-COMMON_CONFIDENCES = [90, 95, 98, 99]
 MAX_SCORE = 1000
 MAX_WHOLE = 10**9
 MAX_DF = 1000
+MAX_DATA = 1000
 TAIL_OPTIONS = ("below", "above", "between")
+SUBSCRIPTS = {"": "", "1": "₁", "2": "₂"}
+
+PARAMETER_NAMES = {
+    "μ": "la media poblacional μ",
+    "μ_D": "la diferencia media μ_D (dato 1 − dato 2)",
+    "μ₁ − μ₂": "la diferencia de medias μ₁ − μ₂",
+    "π": "la proporción poblacional π",
+    "π₁ − π₂": "la diferencia de proporciones π₁ − π₂",
+    "σ²": "la varianza poblacional σ²",
+    "σ₁² / σ₂²": "el cociente de varianzas σ₁² / σ₂²",
+}
 
 
 def fmt(value):
@@ -15,6 +26,8 @@ def fmt(value):
         return str(value)
     return f"{value:.4f}"
 
+
+# ---------- Lectura y validación de los datos ----------
 
 def read_number(data, name, label, minimum=None, maximum=None, whole=False, positive=False):
     try:
@@ -38,6 +51,13 @@ def read_number(data, name, label, minimum=None, maximum=None, whole=False, posi
     return value
 
 
+def read_optional_number(data, name, label):
+    """Como read_number, pero si el campo está vacío devuelve None."""
+    if str(data.get(name, "")).strip() == "":
+        return None
+    return read_number(data, name, label)
+
+
 def read_choice(data, name, label, options):
     value = data.get(name)
     if value not in options:
@@ -58,6 +78,79 @@ def read_sample_size(data, name, label, minimum=2, maximum=None):
     return read_number(data, name, label, minimum=minimum, maximum=maximum, whole=True)
 
 
+def read_data_list(data, name, label):
+    """Convierte un texto como "1.3%, 1.4%, 1.2%" en la lista [1.3, 1.4, 1.2]."""
+    text = str(data.get(name, ""))
+    # Las comas y los punto y coma separan datos; %, $, corchetes y paréntesis se ignoran
+    for symbol in (",", ";", "%", "$", "[", "]", "(", ")"):
+        text = text.replace(symbol, " ")
+    values = []
+    for piece in text.split():
+        try:
+            value = float(piece)
+        except ValueError:
+            raise ValueError(f"{label}: «{piece}» no es un número (usa punto decimal).")
+        if not math.isfinite(value):
+            raise ValueError(f"{label}: «{piece}» no es un número válido.")
+        values.append(value)
+    if len(values) < 2:
+        raise ValueError(f"{label}: escribe al menos 2 datos.")
+    if len(values) > MAX_DATA:
+        raise ValueError(f"{label}: escribe como máximo {MAX_DATA} datos.")
+    return values
+
+
+def sample_stats(values, label):
+    """Media y desviación estándar muestral (se divide entre n − 1) de una lista de datos."""
+    n = len(values)
+    mean = sum(values) / n
+    squares = 0
+    for value in values:
+        squares += (value - mean) ** 2
+    std_dev = math.sqrt(squares / (n - 1))
+    if std_dev == 0:
+        raise ValueError(f"{label}: todos los datos son iguales, la desviación estándar es 0.")
+    return mean, std_dev, n
+
+
+def read_sample(data, number, std_symbol, min_n=2):
+    """Media, desviación estándar y tamaño de una muestra.
+    Se leen del resumen que escribió el usuario o se calculan con su lista de datos."""
+    which = f" {number}" if number else ""
+    sub = SUBSCRIPTS[number]
+    if data.get("input_mode") == "data":
+        values = read_data_list(data, "values" + number, f"Datos{which}")
+        return sample_stats(values, f"Datos{which}")
+    mean = read_number(data, "mean" + number, f"Media{which} (x̄{sub})")
+    std_label = f"Desviación estándar{which} ({std_symbol}{sub})"
+    std_dev = read_number(data, "std_dev" + number, std_label, positive=True)
+    n = read_sample_size(data, "n" + number, f"Tamaño de muestra{which} (n{sub})", minimum=min_n)
+    return mean, std_dev, n
+
+
+def read_variance(data, number=""):
+    """Varianza muestral s² y tamaño de muestra, a partir de s², de s o de la lista de datos."""
+    which = f" {number}" if number else ""
+    sub = SUBSCRIPTS[number]
+    modes = ("variance", "std_dev", "data")
+    mode = read_choice(data, "input_mode", "¿Cómo tienes los datos?", modes)
+    if mode == "data":
+        values = read_data_list(data, "values" + number, f"Datos{which}")
+        if len(values) > MAX_DF + 1:
+            raise ValueError(f"Datos{which}: escribe como máximo {MAX_DF + 1} datos.")
+        mean, std_dev, n = sample_stats(values, f"Datos{which}")
+        return std_dev ** 2, n
+    n_label = f"Tamaño de muestra{which} (n{sub})"
+    n = read_sample_size(data, "n" + number, n_label, maximum=MAX_DF + 1)
+    if mode == "std_dev":
+        std_dev = read_number(data, "std_dev" + number, f"Desviación estándar{which} (s{sub})",
+                              positive=True)
+        return std_dev ** 2, n
+    variance = read_number(data, "variance" + number, f"Varianza muestral{which} (s{sub}²)",
+                           positive=True)
+    return variance, n
+
+
 def read_distribution(data):
     """Distribución elegida y las filas de la tabla que describen sus grados de libertad."""
     name = data.get("distribution")
@@ -74,28 +167,35 @@ def read_distribution(data):
     return fisher_f(df1, df2), [("ν₁ (numerador)", df1), ("ν₂ (denominador)", df2)]
 
 
+# ---------- Tabla y gráfica ----------
+
 def values_table(rows):
-    return {
-        "title": "Valores del cálculo",
-        "headers": ["Concepto", "Valor"],
-        "rows": [[label, fmt(value)] for label, value in rows],
-    }
+    table_rows = []
+    for label, value in rows:
+        table_rows.append([label, fmt(value)])
+    return {"title": "Valores del cálculo", "headers": ["Concepto", "Valor"], "rows": table_rows}
 
 
 def chart_ticks(start, end):
-    # Paso "redondo" (1, 2 o 5 por una potencia de 10) para tener 10 marcas en el eje
+    # Se busca un paso "redondo" (1, 2 o 5 por una potencia de 10) que deje unas 10 marcas en el eje
     raw_step = (end - start) / 10
     power = 10 ** math.floor(math.log10(raw_step))
-    step = next(m * power for m in (1, 2, 5, 10) if m * power >= raw_step)
-    first = math.ceil(start / step)
-    last = math.floor(end / step)
-    return [round(i * step, 10) for i in range(first, last + 1)]
+    for multiple in (1, 2, 5, 10):
+        step = multiple * power
+        if step >= raw_step:
+            break
+    ticks = []
+    for i in range(math.ceil(start / step), math.floor(end / step) + 1):
+        ticks.append(round(i * step, 10))
+    return ticks
 
 
 def make_chart(dist, shaded, marks):
     if dist.symmetric:
-        # El eje va de -limit a limit
-        farthest = max(abs(mark) for mark in marks)
+        # El eje va de -limit a limit: lo justo para ver las marcas, entre 4 y 8
+        farthest = 0
+        for mark in marks:
+            farthest = max(farthest, abs(mark))
         limit = min(max(4, math.ceil(farthest + 1)), 8)
         start, end = -limit, limit
     else:
@@ -104,105 +204,162 @@ def make_chart(dist, shaded, marks):
         start = 0
         end = max(dist.quantile(0.99), max(marks) * 1.15)
         end = min(end, dist.quantile(0.999))
-    grid = [start + (end - start) * i / CHART_POINTS for i in range(CHART_POINTS + 1)]
-    # Las marcas se agregan como puntos para que el área sombreada empiece en ellas
-    visible_marks = [mark for mark in marks if start <= mark <= end]
-    xs = sorted(set(grid + visible_marks))
+
+    xs = []
+    for i in range(CHART_POINTS + 1):
+        xs.append(start + (end - start) * i / CHART_POINTS)
+    # Las marcas se agregan como puntos para que el área sombreada empiece justo en ellas
+    for mark in marks:
+        if start <= mark <= end and mark not in xs:
+            xs.append(mark)
+    xs.sort()
+
+    points = []
+    for x in xs:
+        points.append([x, dist.curve(x)])
     return {
         "axis": dist.axis,
         "start": start,
         "end": end,
         "ticks": chart_ticks(start, end),
-        "points": [[x, dist.curve(x)] for x in xs],
+        "points": points,
         "shaded": shaded,
         "marks": marks,
     }
 
 
-def two_sided_critical(dist, confidence):
-    return dist.quantile(1 - (1 - confidence) / 2)
+# ---------- Conclusiones (prueba de hipótesis con el intervalo) ----------
+
+def claim_conclusion(symbol, claimed, lower, upper):
+    """H₀ se rechaza si el valor afirmado queda fuera del intervalo."""
+    text = f"H₀: {symbol} = {claimed:g} y H₁: {symbol} ≠ {claimed:g}. "
+    if lower <= claimed <= upper:
+        return text + f"El valor {claimed:g} está dentro del intervalo: no se rechaza H₀."
+    return text + f"El valor {claimed:g} está fuera del intervalo: se rechaza H₀."
 
 
-def difference_criterion(lower, upper, first, second):
+def difference_conclusion(lower, upper, first, second):
+    text = f"H₀: {first} = {second} y H₁: {first} ≠ {second}. "
     if lower > 0:
-        return f"Criterio de decisión: ambos límites son positivos, así que {first} > {second}."
+        return text + ("Ambos límites son positivos: se rechaza H₀ y se concluye que "
+                       f"{first} > {second}.")
     if upper < 0:
-        return f"Criterio de decisión: ambos límites son negativos, así que {first} < {second}."
-    return f"Criterio de decisión: el intervalo incluye el 0, así que {first} = {second}."
+        return text + ("Ambos límites son negativos: se rechaza H₀ y se concluye que "
+                       f"{first} < {second}.")
+    return text + f"El intervalo incluye el 0: no se rechaza H₀, así que {first} = {second}."
 
 
-def ratio_criterion(lower, upper):
+def ratio_conclusion(lower, upper):
+    text = "H₀: σ₁² = σ₂² y H₁: σ₁² ≠ σ₂². "
     if lower > 1:
-        return "Criterio de decisión: ambos límites son mayores que 1, así que σ₁² > σ₂²."
+        return text + ("Ambos límites son mayores que 1: se rechaza H₀; las varianzas son "
+                       "significativamente diferentes (σ₁² > σ₂²).")
     if upper < 1:
-        return "Criterio de decisión: ambos límites son menores que 1, así que σ₁² < σ₂²."
-    return "Criterio de decisión: el intervalo incluye el 1, así que σ₁² = σ₂²."
+        return text + ("Ambos límites son menores que 1: se rechaza H₀; las varianzas son "
+                       "significativamente diferentes (σ₁² < σ₂²).")
+    return text + ("El intervalo incluye el 1: no se rechaza H₀; las varianzas no son "
+                   "significativamente diferentes.")
 
 
-def interval_result(symbol, confidence, lower, upper, rows, chart, notes=()):
+# ---------- Intervalos ----------
+
+def interval_result(symbol, confidence, lower, upper, rows, chart, conclusion="", notes=()):
     rows = rows + [("Límite inferior", lower), ("Límite superior", upper)]
+    interpretation = (f"Con {confidence * 100:g}% de confianza, {PARAMETER_NAMES[symbol]} "
+                      f"está entre {fmt(lower)} y {fmt(upper)}.")
+    if conclusion:
+        interpretation += " " + conclusion
     return {
         "answer": f"Intervalo de confianza al {confidence * 100:g}% para {symbol}: "
                   f"({fmt(lower)} , {fmt(upper)})",
+        "interpretation": interpretation,
         "tables": [values_table(rows)],
         "chart": chart,
         "notes": list(notes),
     }
 
 
-def estimate_plus_minus(symbol, estimate, standard_error, dist, confidence, rows,
-                        compare=None, notes=()):
-    """Intervalo de la forma estimación ± valor crítico · error estándar (Z y t)."""
-    critical = two_sided_critical(dist, confidence)
+def plus_minus_limits(estimate, standard_error, dist, confidence, rows):
+    """Límites de estimación ± valor crítico · error estándar (Z y t).
+    También agrega sus filas a la tabla."""
+    critical = dist.quantile(1 - (1 - confidence) / 2)
     margin = critical * standard_error
-    lower = estimate - margin
-    upper = estimate + margin
-    rows = rows + [
+    rows += [
         ("Error estándar", standard_error),
         (f"Valor crítico {dist.axis}", critical),
         ("Margen de error (e)", margin),
     ]
-    notes = list(notes)
-    if compare:
-        notes.append(difference_criterion(lower, upper, *compare))
     chart = make_chart(dist, [[-critical, critical]], [-critical, critical])
-    return interval_result(symbol, confidence, lower, upper, rows, chart, notes)
+    return estimate - margin, estimate + margin, chart
 
 
-def one_mean(data, symbol="μ", mean_label="Media muestral (x̄)", std_label=None):
+def one_mean(data):
     known_sigma = data.get("distribution") == "z"
-    if std_label is None:
-        std_label = "Desviación estándar (σ)" if known_sigma else "Desviación estándar muestral (s)"
-    mean = read_number(data, "sample_mean", mean_label)
-    std_dev = read_number(data, "std_dev", std_label, positive=True)
-    n = read_sample_size(data, "n", "Tamaño de muestra (n)", minimum=1 if known_sigma else 2)
+    if known_sigma:
+        std_label = "Desviación estándar (σ)"
+        mean, std_dev, n = read_sample(data, "", "σ", min_n=1)
+    else:
+        std_label = "Desviación estándar muestral (s)"
+        mean, std_dev, n = read_sample(data, "", "s")
+    claimed = read_optional_number(data, "claimed", "Valor afirmado (μ₀)")
     confidence = read_confidence(data)
-    rows = [(mean_label, mean), (std_label, std_dev), ("Tamaño de muestra (n)", n)]
+    rows = [("Media muestral (x̄)", mean), (std_label, std_dev), ("Tamaño de muestra (n)", n)]
+    notes = []
     if known_sigma:
         dist = NORMAL
     else:
         dist = student_t(n - 1)
         rows.append(("Grados de libertad (n − 1)", n - 1))
-    return estimate_plus_minus(symbol, mean, std_dev / math.sqrt(n), dist, confidence, rows)
+        if n >= 30:
+            notes.append("Con n ≥ 30 el formulario indica usar Z (una media n ≥ 30).")
+    lower, upper, chart = plus_minus_limits(mean, std_dev / math.sqrt(n), dist, confidence, rows)
+    conclusion = ""
+    if claimed is not None:
+        conclusion = claim_conclusion("μ", claimed, lower, upper)
+    return interval_result("μ", confidence, lower, upper, rows, chart, conclusion, notes)
 
 
 def paired_samples(data):
     # Es el intervalo de una media con t, aplicado a las diferencias de cada par
-    return one_mean(data, "μ_D", "Media de las diferencias (d̄)",
-                    "Desviación estándar de las diferencias (s_d)")
+    rows = []
+    if data.get("input_mode") == "pairs":
+        first = read_data_list(data, "values1", "Datos 1 (antes)")
+        second = read_data_list(data, "values2", "Datos 2 (después)")
+        if len(first) != len(second):
+            raise ValueError("Las dos columnas deben tener la misma cantidad de datos.")
+        differences = []
+        for i in range(len(first)):
+            differences.append(first[i] - second[i])
+        mean, std_dev, n = sample_stats(differences, "Diferencias")
+        texts = []
+        for difference in differences:
+            texts.append(f"{difference:g}")
+        rows.append(("Diferencias d = dato 1 − dato 2", ", ".join(texts)))
+    else:
+        mean = read_number(data, "mean", "Media de las diferencias (d̄)")
+        std_dev = read_number(data, "std_dev", "Desviación estándar de las diferencias (s_d)",
+                              positive=True)
+        n = read_sample_size(data, "n", "Número de pares (n)")
+    confidence = read_confidence(data)
+    rows += [("Media de las diferencias (d̄)", mean),
+             ("Desviación estándar de las diferencias (s_d)", std_dev),
+             ("Número de pares (n)", n), ("Grados de libertad (n − 1)", n - 1)]
+    lower, upper, chart = plus_minus_limits(mean, std_dev / math.sqrt(n), student_t(n - 1),
+                                            confidence, rows)
+    conclusion = difference_conclusion(lower, upper, "μ₁", "μ₂")
+    return interval_result("μ_D", confidence, lower, upper, rows, chart, conclusion)
 
 
 def two_means(data):
     known_sigma = data.get("distribution") == "z"
     std_symbol = "σ" if known_sigma else "s"
-    mean1 = read_number(data, "mean1", "Media de la muestra 1 (x̄₁)")
-    std1 = read_number(data, "std_dev1", f"Desviación estándar 1 ({std_symbol}₁)", positive=True)
-    n1 = read_sample_size(data, "n1", "Tamaño de muestra 1 (n₁)")
-    mean2 = read_number(data, "mean2", "Media de la muestra 2 (x̄₂)")
-    std2 = read_number(data, "std_dev2", f"Desviación estándar 2 ({std_symbol}₂)", positive=True)
-    n2 = read_sample_size(data, "n2", "Tamaño de muestra 2 (n₂)")
+    mean1, std1, n1 = read_sample(data, "1", std_symbol)
+    mean2, std2, n2 = read_sample(data, "2", std_symbol)
     confidence = read_confidence(data)
-    rows = [("Diferencia de medias (x̄₁ − x̄₂)", mean1 - mean2)]
+    rows = [("Media 1 (x̄₁)", mean1), (f"Desviación estándar 1 ({std_symbol}₁)", std1),
+            ("Tamaño de muestra 1 (n₁)", n1), ("Media 2 (x̄₂)", mean2),
+            (f"Desviación estándar 2 ({std_symbol}₂)", std2), ("Tamaño de muestra 2 (n₂)", n2),
+            ("Diferencia de medias (x̄₁ − x̄₂)", mean1 - mean2)]
     part1 = std1 ** 2 / n1
     part2 = std2 ** 2 / n2
 
@@ -222,8 +379,9 @@ def two_means(data):
         standard_error = math.sqrt(part1 + part2)
         rows.append(("Grados de libertad (ν)", df))
 
-    return estimate_plus_minus("μ₁ − μ₂", mean1 - mean2, standard_error, dist, confidence, rows,
-                               compare=("μ₁", "μ₂"))
+    lower, upper, chart = plus_minus_limits(mean1 - mean2, standard_error, dist, confidence, rows)
+    conclusion = difference_conclusion(lower, upper, "μ₁", "μ₂")
+    return interval_result("μ₁ − μ₂", confidence, lower, upper, rows, chart, conclusion)
 
 
 def proportion_notes(samples):
@@ -237,12 +395,17 @@ def proportion_notes(samples):
 def one_proportion(data):
     n = read_sample_size(data, "n", "Tamaño de muestra (n)", minimum=1)
     successes = read_number(data, "successes", "Éxitos (x)", minimum=0, maximum=n, whole=True)
+    claimed = read_optional_number(data, "claimed", "Valor afirmado (π₀)")
     confidence = read_confidence(data)
     p = successes / n
     rows = [("Tamaño de muestra (n)", n), ("Éxitos (x)", successes), ("Proporción muestral (p)", p),
             ("q = 1 − p", 1 - p)]
-    return estimate_plus_minus("π", p, math.sqrt(p * (1 - p) / n), NORMAL, confidence, rows,
-                               notes=proportion_notes([(successes, n)]))
+    lower, upper, chart = plus_minus_limits(p, math.sqrt(p * (1 - p) / n), NORMAL, confidence, rows)
+    conclusion = ""
+    if claimed is not None:
+        conclusion = claim_conclusion("π", claimed, lower, upper)
+    return interval_result("π", confidence, lower, upper, rows, chart, conclusion,
+                           proportion_notes([(successes, n)]))
 
 
 def two_proportions(data):
@@ -258,16 +421,64 @@ def two_proportions(data):
     standard_error = math.sqrt(p1 * (1 - p1) / n1 + p2 * (1 - p2) / n2)
     rows = [("Proporción muestra 1 (p₁)", p1), ("Proporción muestra 2 (p₂)", p2),
             ("Diferencia (p₁ − p₂)", p1 - p2)]
-    notes = proportion_notes([(successes1, n1), (successes2, n2)])
-    return estimate_plus_minus("π₁ − π₂", p1 - p2, standard_error, NORMAL, confidence, rows,
-                               compare=("π₁", "π₂"), notes=notes)
+    lower, upper, chart = plus_minus_limits(p1 - p2, standard_error, NORMAL, confidence, rows)
+    conclusion = difference_conclusion(lower, upper, "π₁", "π₂")
+    return interval_result("π₁ − π₂", confidence, lower, upper, rows, chart, conclusion,
+                           proportion_notes([(successes1, n1), (successes2, n2)]))
 
+
+def one_variance(data):
+    variance, n = read_variance(data)
+    claimed = read_optional_number(data, "claimed", "Valor afirmado (σ₀²)")
+    confidence = read_confidence(data)
+    df = n - 1
+    dist = chi_square(df)
+    alpha = 1 - confidence
+    # χ² no es simétrica: se necesita un valor crítico de cada lado
+    left = dist.quantile(alpha / 2)
+    right = dist.quantile(1 - alpha / 2)
+    lower = df * variance / right
+    upper = df * variance / left
+    rows = [("Tamaño de muestra (n)", n), ("Varianza muestral (s²)", variance),
+            ("Grados de libertad (n − 1)", df), ("χ² α/2 (cola derecha)", right),
+            ("χ² 1−α/2 (cola izquierda)", left)]
+    conclusion = (f"Para la desviación estándar, σ está entre {fmt(math.sqrt(lower))} "
+                  f"y {fmt(math.sqrt(upper))}.")
+    if claimed is not None:
+        conclusion += " " + claim_conclusion("σ²", claimed, lower, upper)
+    chart = make_chart(dist, [[left, right]], [left, right])
+    return interval_result("σ²", confidence, lower, upper, rows, chart, conclusion)
+
+
+def variance_ratio(data):
+    variance1, n1 = read_variance(data, "1")
+    variance2, n2 = read_variance(data, "2")
+    confidence = read_confidence(data)
+    df1 = n1 - 1
+    df2 = n2 - 1
+    alpha = 1 - confidence
+    ratio = variance1 / variance2
+    f_12 = fisher_f(df1, df2).quantile(1 - alpha / 2)
+    f_21 = fisher_f(df2, df1).quantile(1 - alpha / 2)
+    lower = ratio / f_12
+    upper = ratio * f_21
+    rows = [("Varianza 1 (s₁²)", variance1), ("Tamaño de muestra 1 (n₁)", n1),
+            ("Varianza 2 (s₂²)", variance2), ("Tamaño de muestra 2 (n₂)", n2),
+            ("Cociente s₁² / s₂²", ratio), ("ν₁ = n₁ − 1", df1), ("ν₂ = n₂ − 1", df2),
+            ("F α/2 (ν₁, ν₂)", f_12), ("F α/2 (ν₂, ν₁)", f_21)]
+    # En la curva F(ν₁, ν₂) el valor crítico izquierdo es 1 / F a/2 (ν₂, ν₁)
+    chart = make_chart(fisher_f(df1, df2), [[1 / f_21, f_12]], [1 / f_21, f_12])
+    return interval_result("σ₁² / σ₂²", confidence, lower, upper, rows, chart,
+                           ratio_conclusion(lower, upper))
+
+
+# ---------- Tamaño de muestra y probabilidad ----------
 
 def sample_size(data):
     target = read_choice(data, "target", "Tamaño de muestra para", ("mean", "proportion"))
     error = read_number(data, "error", "Error máximo (e)", positive=True)
     confidence = read_confidence(data)
-    z = two_sided_critical(NORMAL, confidence)
+    z = NORMAL.quantile(1 - (1 - confidence) / 2)
     if target == "mean":
         sigma = read_number(data, "std_dev", "Desviación estándar (σ)", positive=True)
         exact = (z * sigma / error) ** 2
@@ -285,52 +496,12 @@ def sample_size(data):
              ("n (redondeado hacia arriba)", n)]
     return {
         "answer": f"Tamaño de muestra necesario: n = {n}",
+        "interpretation": f"Se necesitan al menos {n} datos para que el error de estimación "
+                          f"no pase de {error:g}, con {confidence * 100:g}% de confianza.",
         "tables": [values_table(rows)],
         "chart": make_chart(NORMAL, [[-z, z]], [-z, z]),
         "notes": [],
     }
-
-
-def one_variance(data):
-    n = read_sample_size(data, "n", "Tamaño de muestra (n)", maximum=MAX_DF + 1)
-    variance = read_number(data, "variance", "Varianza muestral (s²)", positive=True)
-    confidence = read_confidence(data)
-    df = n - 1
-    dist = chi_square(df)
-    alpha = 1 - confidence
-    # χ² no es simétrica: se necesita un valor crítico de cada lado
-    left = dist.quantile(alpha / 2)
-    right = dist.quantile(1 - alpha / 2)
-    lower = df * variance / right
-    upper = df * variance / left
-    rows = [("Tamaño de muestra (n)", n), ("Varianza muestral (s²)", variance),
-            ("Grados de libertad (n − 1)", df), ("χ² α/2 (cola derecha)", right),
-            ("χ² 1−α/2 (cola izquierda)", left)]
-    notes = [f"Para la desviación estándar σ: ({fmt(math.sqrt(lower))} , {fmt(math.sqrt(upper))})"]
-    chart = make_chart(dist, [[left, right]], [left, right])
-    return interval_result("σ²", confidence, lower, upper, rows, chart, notes)
-
-
-def variance_ratio(data):
-    n1 = read_sample_size(data, "n1", "Tamaño de muestra 1 (n₁)", maximum=MAX_DF + 1)
-    variance1 = read_number(data, "variance1", "Varianza muestral 1 (s₁²)", positive=True)
-    n2 = read_sample_size(data, "n2", "Tamaño de muestra 2 (n₂)", maximum=MAX_DF + 1)
-    variance2 = read_number(data, "variance2", "Varianza muestral 2 (s₂²)", positive=True)
-    confidence = read_confidence(data)
-    df1 = n1 - 1
-    df2 = n2 - 1
-    alpha = 1 - confidence
-    ratio = variance1 / variance2
-    f_12 = fisher_f(df1, df2).quantile(1 - alpha / 2)
-    f_21 = fisher_f(df2, df1).quantile(1 - alpha / 2)
-    lower = ratio / f_12
-    upper = ratio * f_21
-    rows = [("Cociente s₁² / s₂²", ratio), ("ν₁ = n₁ − 1", df1), ("ν₂ = n₂ − 1", df2),
-            ("F α/2 (ν₁, ν₂)", f_12), ("F α/2 (ν₂, ν₁)", f_21)]
-    # En la curva F(ν₁, ν₂) el valor crítico izquierdo es 1 / F a/2 (ν₂, ν₁)
-    chart = make_chart(fisher_f(df1, df2), [[1 / f_21, f_12]], [1 / f_21, f_12])
-    return interval_result("σ₁² / σ₂²", confidence, lower, upper, rows, chart,
-                           [ratio_criterion(lower, upper)])
 
 
 def read_values(data, tail, minimum, maximum):
@@ -348,11 +519,14 @@ def read_z_values(data, tail):
     mean = read_number(data, "mean", "Media (μ)")
     std_dev = read_number(data, "std_dev", "Desviación estándar (σ)", positive=True)
     values = read_values(data, tail, None, None)
-    scores = [(value - mean) / std_dev for value in values]
-    if any(abs(score) > MAX_SCORE for score in scores):
-        raise ValueError("El valor está demasiado lejos de la media.")
     rows = [("Media (μ)", mean), ("Desviación estándar (σ)", std_dev)]
-    rows += [(f"Valor Z {i + 1}", score) for i, score in enumerate(scores)]
+    scores = []
+    for value in values:
+        score = (value - mean) / std_dev
+        if abs(score) > MAX_SCORE:
+            raise ValueError("El valor está demasiado lejos de la media.")
+        scores.append(score)
+        rows.append((f"Valor Z {len(scores)}", score))
     return values, scores, rows
 
 
@@ -374,79 +548,24 @@ def probability(data):
     if tail == "below":
         result = dist.below(scores[0])
         text = f"P({variable} < {values[0]:g})"
+        meaning = f"sea menor que {values[0]:g}"
         shaded = [[None, scores[0]]]
     elif tail == "above":
         result = dist.above(scores[0])
         text = f"P({variable} > {values[0]:g})"
+        meaning = f"sea mayor que {values[0]:g}"
         shaded = [[scores[0], None]]
     else:
         result = dist.below(scores[1]) - dist.below(scores[0])
         text = f"P({values[0]:g} < {variable} < {values[1]:g})"
+        meaning = f"esté entre {values[0]:g} y {values[1]:g}"
         shaded = [[scores[0], scores[1]]]
     rows += [("Probabilidad", result), ("Probabilidad complementaria", 1 - result)]
     return {
         "answer": f"{text} = {result:.4f}  ({result * 100:.2f}%)",
+        "interpretation": f"La probabilidad de que {variable} {meaning} es {result * 100:.2f}%.",
         "tables": [values_table(rows)],
         "chart": make_chart(dist, shaded, scores),
-        "notes": [],
-    }
-
-
-def critical_values(dist, confidence):
-    """(izquierdo, derecho) de dos colas y el de una cola (derecha)."""
-    alpha = 1 - confidence
-    right = dist.quantile(1 - alpha / 2)
-    left = -right if dist.symmetric else dist.quantile(alpha / 2)
-    return left, right, dist.quantile(1 - alpha)
-
-
-def two_tail_text(dist, left, right):
-    if dist.symmetric:
-        return f"±{fmt(right)}"
-    return f"{fmt(left)} y {fmt(right)}"
-
-
-def critical_value(data):
-    dist, rows = read_distribution(data)
-    confidence = read_confidence(data)
-    tails = read_choice(data, "tails", "Tipo de prueba", ("two", "one"))
-    axis = dist.axis
-    left, right, one_tail = critical_values(dist, confidence)
-    if tails == "two":
-        value = two_tail_text(dist, left, right)
-        if dist.symmetric:
-            answer = f"Valor crítico {axis}α/2 = {value}"
-        else:
-            answer = f"Valores críticos: {axis}1−α/2 = {fmt(left)} y {axis}α/2 = {fmt(right)}"
-        shaded = [[None, left], [right, None]]
-        marks = [left, right]
-    else:
-        value = fmt(one_tail)
-        answer = f"Valor crítico {axis}α = {value}"
-        shaded = [[one_tail, None]]
-        marks = [one_tail]
-    rows += [
-        ("Nivel de confianza", f"{confidence * 100:g}%"),
-        ("Nivel de significancia (α)", 1 - confidence),
-        ("Colas", "Dos colas" if tails == "two" else "Una cola (derecha)"),
-        ("Valor crítico", value),
-    ]
-
-    common_rows = []
-    for level in COMMON_CONFIDENCES:
-        left, right, one_tail = critical_values(dist, level / 100)
-        common_rows.append([f"{level}%", two_tail_text(dist, left, right), fmt(one_tail)])
-    return {
-        "answer": answer,
-        "tables": [
-            values_table(rows),
-            {
-                "title": "Valores críticos más usados",
-                "headers": ["Confianza", f"{axis} (dos colas)", f"{axis} (una cola)"],
-                "rows": common_rows,
-            },
-        ],
-        "chart": make_chart(dist, shaded, marks),
         "notes": [],
     }
 
@@ -458,18 +577,14 @@ PROBLEMS = {
     ("z", "two_proportions"): two_proportions,
     ("z", "sample_size"): sample_size,
     ("z", "probability"): probability,
-    ("z", "critical_value"): critical_value,
     ("t", "mean_interval"): one_mean,
     ("t", "two_means"): two_means,
     ("t", "paired"): paired_samples,
     ("t", "probability"): probability,
-    ("t", "critical_value"): critical_value,
     ("chi2", "variance_interval"): one_variance,
     ("chi2", "probability"): probability,
-    ("chi2", "critical_value"): critical_value,
     ("f", "variance_ratio"): variance_ratio,
     ("f", "probability"): probability,
-    ("f", "critical_value"): critical_value,
 }
 
 

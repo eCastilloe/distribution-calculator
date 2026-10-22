@@ -1,16 +1,32 @@
+// Cada problema define sus campos. "showWhen" muestra un campo solo cuando otro campo
+// tiene uno de los valores indicados (por ejemplo, la lista de datos solo en el modo "Lista de datos").
+
 const CONFIDENCE = { name: "confidence", label: "Nivel de confianza (%)", value: "95" };
-const TAILS = {
-  name: "tails",
-  label: "Tipo de valor crítico",
-  options: [["two", "Dos colas (intervalos de confianza)"], ["one", "Una cola (derecha)"]],
-};
 const DF = { name: "df", label: "Grados de libertad (gl)", placeholder: "ej. 10" };
 const F_DFS = [
   { name: "df1", label: "Grados de libertad del numerador (ν₁)", placeholder: "ej. 5" },
   { name: "df2", label: "Grados de libertad del denominador (ν₂)", placeholder: "ej. 10" },
 ];
+const DATA_HINT = "En «Lista de datos» pega los valores separados por comas o espacios " +
+  "(usa punto decimal; el símbolo % se ignora).";
+const CLAIM_HINT = "Si el problema hace una afirmación (por ejemplo, «el promedio es 300»), " +
+  "escríbela en «Valor afirmado» para obtener H₀, H₁ y la decisión. Si no, déjalo vacío.";
 const DIFFERENCE_HINT = "Si ambos límites son positivos, el primero es mayor; si ambos son negativos, " +
   "es menor; si el intervalo incluye el 0, se consideran iguales.";
+
+const MEAN_MODE = {
+  name: "input_mode",
+  label: "¿Cómo tienes los datos?",
+  options: [["summary", "Media, desviación estándar y n"], ["data", "Lista de datos"]],
+};
+const VARIANCE_MODE = {
+  name: "input_mode",
+  label: "¿Cómo tienes los datos?",
+  options: [["variance", "Varianza (s²) y n"], ["std_dev", "Desviación estándar (s) y n"], ["data", "Lista de datos"]],
+};
+const SUMMARY = ["input_mode", ["summary"]];
+const DATA = ["input_mode", ["data"]];
+const NOT_DATA = ["input_mode", ["variance", "std_dev"]];
 
 function probabilityFields(valueLabel) {
   return [
@@ -24,18 +40,34 @@ function probabilityFields(valueLabel) {
       ],
     },
     { name: "x", label: valueLabel, placeholder: "ej. 1.5" },
-    { name: "x2", label: "Segundo valor", placeholder: "ej. 2.5", showWhen: ["tail", "between"] },
+    { name: "x2", label: "Segundo valor", placeholder: "ej. 2.5", showWhen: ["tail", ["between"]] },
+  ];
+}
+
+function oneMeanFields(stdLabel) {
+  return [
+    MEAN_MODE,
+    { name: "mean", label: "Media muestral (x̄)", placeholder: "ej. 320", showWhen: SUMMARY },
+    { name: "std_dev", label: stdLabel, placeholder: "ej. 40", showWhen: SUMMARY },
+    { name: "n", label: "Tamaño de muestra (n)", placeholder: "ej. 64", showWhen: SUMMARY },
+    { name: "values", label: "Datos", type: "textarea", placeholder: "ej. 6.2, 6.5, 6.1, 6.4", showWhen: DATA },
+    CONFIDENCE,
+    { name: "claimed", label: "Valor afirmado μ₀ (opcional)", placeholder: "ej. 300" },
   ];
 }
 
 function twoMeansFields(stdSymbol) {
   return [
-    { name: "mean1", label: "Media de la muestra 1 (x̄₁)", placeholder: "ej. 80" },
-    { name: "std_dev1", label: `Desviación estándar 1 (${stdSymbol}₁)`, placeholder: "ej. 10" },
-    { name: "n1", label: "Tamaño de muestra 1 (n₁)", placeholder: "ej. 50" },
-    { name: "mean2", label: "Media de la muestra 2 (x̄₂)", placeholder: "ej. 75" },
-    { name: "std_dev2", label: `Desviación estándar 2 (${stdSymbol}₂)`, placeholder: "ej. 12" },
-    { name: "n2", label: "Tamaño de muestra 2 (n₂)", placeholder: "ej. 60" },
+    MEAN_MODE,
+    { name: "mean1", label: "Media de la muestra 1 (x̄₁)", placeholder: "ej. 82", showWhen: SUMMARY },
+    { name: "std_dev1", label: "Desviación estándar 1 (" + stdSymbol + "₁)", placeholder: "ej. 5", showWhen: SUMMARY },
+    { name: "n1", label: "Tamaño de muestra 1 (n₁)", placeholder: "ej. 15", showWhen: SUMMARY },
+    { name: "mean2", label: "Media de la muestra 2 (x̄₂)", placeholder: "ej. 76", showWhen: SUMMARY },
+    { name: "std_dev2", label: "Desviación estándar 2 (" + stdSymbol + "₂)", placeholder: "ej. 6", showWhen: SUMMARY },
+    { name: "n2", label: "Tamaño de muestra 2 (n₂)", placeholder: "ej. 12", showWhen: SUMMARY },
+    { name: "values1", label: "Datos de la muestra 1", type: "textarea", placeholder: "ej. 82, 79, 88", showWhen: DATA },
+    { name: "values2", label: "Datos de la muestra 2", type: "textarea", placeholder: "ej. 76, 70, 81", showWhen: DATA },
+    CONFIDENCE,
   ];
 }
 
@@ -45,36 +77,32 @@ const DISTRIBUTIONS = {
     problems: {
       mean_interval: {
         label: "Intervalo para una media",
-        hint: "Si no conoces σ pero n ≥ 30, puedes usar la desviación muestral s.",
-        fields: [
-          { name: "sample_mean", label: "Media muestral (x̄)", placeholder: "ej. 50" },
-          { name: "std_dev", label: "Desviación estándar (σ)", placeholder: "ej. 8" },
-          { name: "n", label: "Tamaño de muestra (n)", placeholder: "ej. 64" },
-          CONFIDENCE,
-        ],
+        hint: "Si no conoces σ pero n ≥ 30, usa la desviación muestral s. " + CLAIM_HINT + " " + DATA_HINT,
+        fields: oneMeanFields("Desviación estándar (σ)"),
       },
       two_means: {
         label: "Intervalo para dos medias",
         hint: "Para σ conocidas o muestras grandes (n ≥ 30). " + DIFFERENCE_HINT,
-        fields: [...twoMeansFields("σ"), CONFIDENCE],
+        fields: twoMeansFields("σ"),
       },
       one_proportion: {
         label: "Intervalo para una proporción",
-        hint: "x es la cantidad de éxitos en la muestra; la proporción es p = x / n.",
+        hint: "x es la cantidad de éxitos en la muestra; la proporción es p = x / n. " + CLAIM_HINT,
         fields: [
-          { name: "n", label: "Tamaño de muestra (n)", placeholder: "ej. 100" },
-          { name: "successes", label: "Éxitos (x)", placeholder: "ej. 45" },
+          { name: "n", label: "Tamaño de muestra (n)", placeholder: "ej. 500" },
+          { name: "successes", label: "Éxitos (x)", placeholder: "ej. 390" },
           CONFIDENCE,
+          { name: "claimed", label: "Valor afirmado π₀ (opcional)", placeholder: "ej. 0.8" },
         ],
       },
       two_proportions: {
         label: "Intervalo para dos proporciones",
         hint: DIFFERENCE_HINT,
         fields: [
-          { name: "n1", label: "Tamaño de muestra 1 (n₁)", placeholder: "ej. 100" },
-          { name: "successes1", label: "Éxitos de la muestra 1 (x₁)", placeholder: "ej. 45" },
-          { name: "n2", label: "Tamaño de muestra 2 (n₂)", placeholder: "ej. 90" },
-          { name: "successes2", label: "Éxitos de la muestra 2 (x₂)", placeholder: "ej. 30" },
+          { name: "n1", label: "Tamaño de muestra 1 (n₁)", placeholder: "ej. 250" },
+          { name: "successes1", label: "Éxitos de la muestra 1 (x₁)", placeholder: "ej. 180" },
+          { name: "n2", label: "Tamaño de muestra 2 (n₂)", placeholder: "ej. 240" },
+          { name: "successes2", label: "Éxitos de la muestra 2 (x₂)", placeholder: "ej. 150" },
           CONFIDENCE,
         ],
       },
@@ -88,8 +116,8 @@ const DISTRIBUTIONS = {
             label: "¿Para qué parámetro?",
             options: [["mean", "Una media"], ["proportion", "Una proporción"]],
           },
-          { name: "std_dev", label: "Desviación estándar (σ)", placeholder: "ej. 15", showWhen: ["target", "mean"] },
-          { name: "p", label: "Proporción estimada (p)", value: "0.5", showWhen: ["target", "proportion"] },
+          { name: "std_dev", label: "Desviación estándar (σ)", placeholder: "ej. 15", showWhen: ["target", ["mean"]] },
+          { name: "p", label: "Proporción estimada (p)", value: "0.5", showWhen: ["target", ["proportion"]] },
           { name: "error", label: "Error máximo (e)", placeholder: "ej. 3 (media) o 0.05 (proporción)" },
           CONFIDENCE,
         ],
@@ -99,12 +127,7 @@ const DISTRIBUTIONS = {
         fields: [
           { name: "mean", label: "Media (μ)", value: "0" },
           { name: "std_dev", label: "Desviación estándar (σ)", value: "1" },
-          ...probabilityFields("Valor x"),
-        ],
-      },
-      critical_value: {
-        label: "Valor crítico",
-        fields: [CONFIDENCE, TAILS],
+        ].concat(probabilityFields("Valor x")),
       },
     },
   },
@@ -113,16 +136,12 @@ const DISTRIBUTIONS = {
     problems: {
       mean_interval: {
         label: "Intervalo para una media",
-        fields: [
-          { name: "sample_mean", label: "Media muestral (x̄)", placeholder: "ej. 50" },
-          { name: "std_dev", label: "Desviación estándar muestral (s)", placeholder: "ej. 8" },
-          { name: "n", label: "Tamaño de muestra (n)", placeholder: "ej. 10" },
-          CONFIDENCE,
-        ],
+        hint: CLAIM_HINT + " " + DATA_HINT,
+        fields: oneMeanFields("Desviación estándar muestral (s)"),
       },
       two_means: {
         label: "Intervalo para dos medias",
-        hint: "Elige si supones que las varianzas de las dos poblaciones son iguales o diferentes. " +
+        hint: "Elige si el problema dice que las varianzas de las poblaciones son iguales o diferentes. " +
           DIFFERENCE_HINT,
         fields: [
           {
@@ -130,52 +149,51 @@ const DISTRIBUTIONS = {
             label: "Varianzas de las poblaciones",
             options: [["equal", "Suponiéndolas iguales"], ["different", "Suponiéndolas diferentes"]],
           },
-          ...twoMeansFields("s"),
-          CONFIDENCE,
-        ],
+        ].concat(twoMeansFields("s")),
       },
       paired: {
         label: "Muestras pareadas",
-        hint: "Resta los dos datos de cada par (d = antes − después) y captura la media y la " +
-          "desviación estándar de esas diferencias, y cuántos pares hay.",
+        hint: "Pega las dos columnas de la tabla (por ejemplo, antes y después) en el mismo orden: " +
+          "el programa resta cada par (d = dato 1 − dato 2). " + DIFFERENCE_HINT,
         fields: [
-          { name: "sample_mean", label: "Media de las diferencias (d̄)", placeholder: "ej. 2.5" },
-          { name: "std_dev", label: "Desviación estándar de las diferencias (s_d)", placeholder: "ej. 3" },
-          { name: "n", label: "Número de pares (n)", placeholder: "ej. 12" },
+          {
+            name: "input_mode",
+            label: "¿Cómo tienes los datos?",
+            options: [["pairs", "Dos columnas de datos"], ["summary", "Media y desviación de las diferencias"]],
+          },
+          { name: "values1", label: "Datos 1 (por ejemplo, antes)", type: "textarea", placeholder: "ej. 50, 45, 60, 55", showWhen: ["input_mode", ["pairs"]] },
+          { name: "values2", label: "Datos 2 (por ejemplo, después)", type: "textarea", placeholder: "ej. 65, 55, 75, 70", showWhen: ["input_mode", ["pairs"]] },
+          { name: "mean", label: "Media de las diferencias (d̄)", placeholder: "ej. 18.5", showWhen: SUMMARY },
+          { name: "std_dev", label: "Desviación estándar de las diferencias (s_d)", placeholder: "ej. 6.2", showWhen: SUMMARY },
+          { name: "n", label: "Número de pares (n)", placeholder: "ej. 16", showWhen: SUMMARY },
           CONFIDENCE,
         ],
       },
       probability: {
         label: "Probabilidad",
-        fields: [DF, ...probabilityFields("Valor de t")],
-      },
-      critical_value: {
-        label: "Valor crítico",
-        fields: [DF, CONFIDENCE, TAILS],
+        fields: [DF].concat(probabilityFields("Valor de t")),
       },
     },
   },
   chi2: {
-    hint: "Úsala para estimar la varianza (σ²) de una población a partir de la varianza muestral (s²).",
+    hint: "Úsala para estimar la varianza (σ²) o la desviación estándar (σ) de una población.",
     problems: {
       variance_interval: {
         label: "Intervalo para una varianza",
-        hint: "Si tienes la desviación estándar s, elévala al cuadrado. El resultado también " +
-          "incluye el intervalo para σ.",
+        hint: "El resultado también incluye el intervalo para σ. " + CLAIM_HINT + " " + DATA_HINT,
         fields: [
-          { name: "n", label: "Tamaño de muestra (n)", placeholder: "ej. 10" },
-          { name: "variance", label: "Varianza muestral (s²)", placeholder: "ej. 4" },
+          VARIANCE_MODE,
+          { name: "n", label: "Tamaño de muestra (n)", placeholder: "ej. 25", showWhen: NOT_DATA },
+          { name: "variance", label: "Varianza muestral (s²)", placeholder: "ej. 0.0152", showWhen: ["input_mode", ["variance"]] },
+          { name: "std_dev", label: "Desviación estándar muestral (s)", placeholder: "ej. 2.8", showWhen: ["input_mode", ["std_dev"]] },
+          { name: "values", label: "Datos", type: "textarea", placeholder: "ej. 12.4, 13.0, 11.8, 14.2", showWhen: DATA },
           CONFIDENCE,
+          { name: "claimed", label: "Valor afirmado σ₀² (opcional)", placeholder: "ej. 4" },
         ],
       },
       probability: {
         label: "Probabilidad",
-        fields: [DF, ...probabilityFields("Valor de χ²")],
-      },
-      critical_value: {
-        label: "Valor crítico",
-        hint: "χ² no es simétrica: con dos colas hay un valor crítico de cada lado.",
-        fields: [DF, CONFIDENCE, TAILS],
+        fields: [DF].concat(probabilityFields("Valor de χ²")),
       },
     },
   },
@@ -184,24 +202,24 @@ const DISTRIBUTIONS = {
     problems: {
       variance_ratio: {
         label: "Intervalo para el cociente de varianzas",
-        hint: "Si tienes las desviaciones estándar, elévalas al cuadrado. Si ambos límites son menores " +
-          "que 1, σ₁² < σ₂²; si ambos son mayores que 1, σ₁² > σ₂²; si incluye el 1, son iguales.",
+        hint: "Dice si las varianzas son significativamente diferentes: si el intervalo incluye el 1, " +
+          "no lo son. " + DATA_HINT,
         fields: [
-          { name: "n1", label: "Tamaño de muestra 1 (n₁)", placeholder: "ej. 6" },
-          { name: "variance1", label: "Varianza muestral 1 (s₁²)", placeholder: "ej. 9" },
-          { name: "n2", label: "Tamaño de muestra 2 (n₂)", placeholder: "ej. 11" },
-          { name: "variance2", label: "Varianza muestral 2 (s₂²)", placeholder: "ej. 4" },
+          VARIANCE_MODE,
+          { name: "n1", label: "Tamaño de muestra 1 (n₁)", placeholder: "ej. 10", showWhen: NOT_DATA },
+          { name: "variance1", label: "Varianza muestral 1 (s₁²)", placeholder: "ej. 0.005", showWhen: ["input_mode", ["variance"]] },
+          { name: "std_dev1", label: "Desviación estándar 1 (s₁)", placeholder: "ej. 0.07", showWhen: ["input_mode", ["std_dev"]] },
+          { name: "n2", label: "Tamaño de muestra 2 (n₂)", placeholder: "ej. 12", showWhen: NOT_DATA },
+          { name: "variance2", label: "Varianza muestral 2 (s₂²)", placeholder: "ej. 0.002", showWhen: ["input_mode", ["variance"]] },
+          { name: "std_dev2", label: "Desviación estándar 2 (s₂)", placeholder: "ej. 0.04", showWhen: ["input_mode", ["std_dev"]] },
+          { name: "values1", label: "Datos de la muestra 1", type: "textarea", placeholder: "ej. 1.3%, 1.4%, 1.2%", showWhen: DATA },
+          { name: "values2", label: "Datos de la muestra 2", type: "textarea", placeholder: "ej. 1.1%, 1.0%, 1.2%", showWhen: DATA },
           CONFIDENCE,
         ],
       },
       probability: {
         label: "Probabilidad",
-        fields: [...F_DFS, ...probabilityFields("Valor de F")],
-      },
-      critical_value: {
-        label: "Valor crítico",
-        hint: "F no es simétrica: con dos colas hay un valor crítico de cada lado.",
-        fields: [...F_DFS, CONFIDENCE, TAILS],
+        fields: F_DFS.concat(probabilityFields("Valor de F")),
       },
     },
   },
@@ -227,8 +245,8 @@ function showProblems() {
   const distribution = DISTRIBUTIONS[currentDistribution()];
   distributionHint.textContent = distribution.hint;
   problemSelect.innerHTML = "";
-  for (const [key, problem] of Object.entries(distribution.problems)) {
-    problemSelect.add(new Option(problem.label, key));
+  for (const key in distribution.problems) {
+    problemSelect.add(new Option(distribution.problems[key].label, key));
   }
   showFields();
 }
@@ -251,9 +269,15 @@ function showFields() {
 }
 
 function buildInput(field) {
-  const input = document.createElement("input");
-  input.type = "text";
-  input.inputMode = "decimal";
+  let input;
+  if (field.type === "textarea") {
+    input = document.createElement("textarea");
+    input.rows = 3;
+  } else {
+    input = document.createElement("input");
+    input.type = "text";
+    input.inputMode = "decimal";
+  }
   input.name = field.name;
   input.value = field.value || "";
   input.placeholder = field.placeholder || "";
@@ -273,9 +297,10 @@ function buildSelect(field) {
 function updateVisibleFields() {
   for (const field of currentProblem().fields) {
     if (!field.showWhen) continue;
-    const [otherName, otherValue] = field.showWhen;
+    const [otherName, allowedValues] = field.showWhen;
     const other = fieldsBox.querySelector(`[name=${otherName}]`);
-    fieldsBox.querySelector(`[data-name=${field.name}]`).hidden = other.value !== otherValue;
+    const box = fieldsBox.querySelector(`[data-name=${field.name}]`);
+    box.hidden = !allowedValues.includes(other.value);
   }
 }
 
@@ -308,6 +333,9 @@ function showResult(result) {
     return;
   }
   resultBox.append(createElement("div", "answer", result.answer));
+  const interpretation = createElement("div", "interpretation", "");
+  interpretation.append(createElement("strong", "", "Interpretación: "), result.interpretation);
+  resultBox.append(interpretation);
   for (const note of result.notes) {
     resultBox.append(createElement("div", "note", note));
   }
@@ -349,6 +377,7 @@ function drawChart(canvas, chart) {
   const textColor = style.getPropertyValue("--text");
   const mutedColor = style.getPropertyValue("--muted");
 
+  // El canvas se dibuja al doble de resolución en pantallas de alta densidad para que no se vea borroso
   const ratio = window.devicePixelRatio || 1;
   const width = canvas.clientWidth;
   const height = canvas.clientHeight;
@@ -361,9 +390,19 @@ function drawChart(canvas, chart) {
   const top = 22;
   const plotWidth = width - 2 * left;
   const plotHeight = height - top - 28;
-  const maxY = Math.max(...chart.points.map((point) => point[1])) * 1.1;
-  const toX = (x) => left + ((x - chart.start) / (chart.end - chart.start)) * plotWidth;
-  const toY = (y) => top + plotHeight - (y / maxY) * plotHeight;
+  let maxY = 0;
+  for (const [x, y] of chart.points) {
+    if (y > maxY) maxY = y;
+  }
+  maxY = maxY * 1.1;
+
+  // Convierten un valor de la gráfica en una posición en pixeles
+  function toX(x) {
+    return left + ((x - chart.start) / (chart.end - chart.start)) * plotWidth;
+  }
+  function toY(y) {
+    return top + plotHeight - (y / maxY) * plotHeight;
+  }
 
   context.fillStyle = accentSoft;
   for (const [start, end] of chart.shaded) {
@@ -419,9 +458,9 @@ function drawChart(canvas, chart) {
   context.setLineDash([]);
 }
 
-document.querySelectorAll("input[name=distribution]").forEach((radio) => {
+for (const radio of document.querySelectorAll("input[name=distribution]")) {
   radio.addEventListener("change", showProblems);
-});
+}
 problemSelect.addEventListener("change", showFields);
 form.addEventListener("submit", calculate);
 showProblems();

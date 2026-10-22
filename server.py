@@ -68,7 +68,8 @@ class Handler(BaseHTTPRequestHandler):
         except ValueError as error:
             self.send_json(400, {"error": str(error)})
         except Exception:
-            self.send_json(500, {"error": "Ocurrió un error inesperado. Revisa los datos e intenta de nuevo."})
+            message = "Ocurrió un error inesperado. Revisa los datos e intenta de nuevo."
+            self.send_json(500, {"error": message})
 
 
 if __name__ == "__main__":
