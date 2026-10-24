@@ -1,18 +1,27 @@
 :root {
-  --background: #f4ede3;
-  --card: #fffcf7;
-  --field: #fffefb;
-  --text: #2f2a24;
-  --muted: #74685a;
-  --border: #e2d6c5;
-  --accent: #9a5b32;
-  --accent-soft: rgba(154, 91, 50, 0.2);
+  --background: #f5efe6;
+  --card: #fffdf9;
+  --field: #fbf7f1;
+  --text: #2e2620;
+  --muted: #74685b;
+  --border: #e6dbcc;
+  --accent: #a4552f;
+  --accent-dark: #86431f;
+  --accent-soft: rgba(164, 85, 47, 0.18);
+  --accent-tint: #f6e9df;
   --on-accent: #ffffff;
-  --on-accent-muted: #f8efe6;
+  --on-accent-muted: #f8ece2;
+  --header: #3b2c22;
+  --on-header: #f6ede2;
+  --on-header-muted: #d6c6b4;
+  --olive: #6b6a35;
+  --olive-tint: #f2f0e1;
   --error-background: #f8e4dc;
   --error-text: #8a2f1c;
-  --note-background: #f8ecd4;
+  --note-background: #f9edd3;
   --note-text: #6b4b10;
+  --shadow: 0 1px 2px rgba(59, 44, 34, 0.06), 0 6px 18px rgba(59, 44, 34, 0.07);
+  --serif: Georgia, "Iowan Old Style", "Times New Roman", serif;
 }
 
 * {
@@ -28,57 +37,105 @@ body {
   background: var(--background);
   color: var(--text);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
 header {
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 28px 16px 8px;
+  padding: 26px max(16px, calc((100% - 1100px) / 2 + 16px)) 22px;
+  background: var(--header);
+  color: var(--on-header);
 }
 
 h1 {
   margin: 0;
-  font-size: 1.6rem;
+  font-family: var(--serif);
+  font-size: 1.75rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
 }
 
 header p {
   margin: 4px 0 0;
-  color: var(--muted);
+  color: var(--on-header-muted);
 }
 
 main {
   max-width: 1100px;
   margin: 0 auto;
-  padding: 16px;
+  padding: 24px 16px 40px;
   display: grid;
   grid-template-columns: 1fr;
-  gap: 16px;
+  gap: 20px;
   align-items: start;
 }
 
-@media (min-width: 900px) {
-  main {
-    grid-template-columns: 420px 1fr;
+/* Arriba: distribución y problema lado a lado; abajo, los campos en columnas */
+.setup {
+  display: grid;
+  grid-template-columns: 1fr;
+  column-gap: 28px;
+}
+
+@media (min-width: 760px) {
+  .setup {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+#fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 14px 18px;
+  align-items: start;
+}
+
+#fields .field {
+  margin-bottom: 0;
+}
+
+/* Los menús van en su propio renglón y las listas de datos ocupan dos columnas */
+#fields .field:has(select) {
+  grid-column: 1 / -1;
+}
+
+#fields .field:has(select) select {
+  max-width: 440px;
+}
+
+/* Los datos de la muestra 2 empiezan en un renglón nuevo, debajo de los de la muestra 1 */
+#fields [data-name="n2"] {
+  grid-column-start: 1;
+}
+
+@media (min-width: 700px) {
+  #fields .field:has(textarea) {
+    grid-column: span 2;
   }
 }
 
 .card {
   background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 20px;
+  border-radius: 14px;
+  padding: 22px;
+  box-shadow: var(--shadow);
 }
 
 h2 {
-  margin: 0 0 16px;
-  font-size: 1.1rem;
+  margin: 0 0 18px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--serif);
+  font-size: 1.2rem;
+  font-weight: 600;
 }
 
 .choice {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  padding: 4px;
+  background: var(--background);
+  border-radius: 10px;
 }
 
 .choice-option input {
@@ -89,24 +146,31 @@ h2 {
 .choice-option span {
   display: block;
   text-align: center;
-  padding: 10px;
-  border: 1px solid var(--border);
+  padding: 8px 4px;
   border-radius: 8px;
-  font-size: 1.15rem;
+  font-family: var(--serif);
+  font-size: 1.25rem;
   font-weight: 600;
+  line-height: 1.2;
   cursor: pointer;
 }
 
 .choice-option small {
-  font-size: 0.8rem;
+  display: block;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 0.72rem;
   font-weight: 400;
   color: var(--muted);
 }
 
+.choice-option span:hover {
+  background: var(--accent-tint);
+}
+
 .choice-option input:checked + span {
-  border-color: var(--accent);
   background: var(--accent);
   color: var(--on-accent);
+  box-shadow: 0 1px 3px rgba(59, 44, 34, 0.25);
 }
 
 .choice-option input:checked + span small {
@@ -119,8 +183,8 @@ h2 {
 }
 
 .hint {
-  margin: 8px 0 16px;
-  font-size: 0.88rem;
+  margin: 10px 0 18px;
+  font-size: 0.87rem;
   color: var(--muted);
 }
 
@@ -131,8 +195,8 @@ h2 {
 
 .field span {
   display: block;
-  margin-bottom: 4px;
-  font-size: 0.92rem;
+  margin-bottom: 5px;
+  font-size: 0.9rem;
   font-weight: 600;
 }
 
@@ -140,12 +204,12 @@ input[type="text"],
 textarea,
 select {
   width: 100%;
-  padding: 9px 10px;
+  padding: 10px 12px;
   font: inherit;
   color: var(--text);
   background: var(--field);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 8px;
 }
 
 textarea {
@@ -155,21 +219,36 @@ textarea {
 input[type="text"]:focus,
 textarea:focus,
 select:focus {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 button {
   width: 100%;
-  margin-top: 6px;
-  padding: 11px;
+  margin-top: 8px;
+  padding: 12px;
   font: inherit;
   font-weight: 600;
+  letter-spacing: 0.02em;
   color: var(--on-accent);
   background: var(--accent);
   border: 0;
-  border-radius: 6px;
+  border-radius: 10px;
   cursor: pointer;
+}
+
+@media (min-width: 600px) {
+  button {
+    display: block;
+    width: auto;
+    min-width: 240px;
+    margin: 20px 0 0 auto;
+  }
+}
+
+button:hover {
+  background: var(--accent-dark);
 }
 
 button:disabled {
@@ -183,28 +262,34 @@ button:disabled {
 }
 
 .answer {
-  padding: 14px 16px;
-  margin-bottom: 16px;
-  border-left: 4px solid var(--accent);
-  background: var(--background);
-  border-radius: 4px;
-  font-size: 1.15rem;
+  padding: 16px 18px;
+  margin-bottom: 14px;
+  background: var(--accent-tint);
+  border-radius: 10px;
+  font-family: var(--serif);
+  font-size: 1.25rem;
   font-weight: 600;
+  font-variant-numeric: lining-nums tabular-nums;
 }
 
 .interpretation {
   padding: 12px 16px;
   margin-bottom: 16px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
+  background: var(--olive-tint);
+  border-left: 3px solid var(--olive);
+  border-radius: 0 10px 10px 0;
   font-size: 0.95rem;
+}
+
+.interpretation strong {
+  color: var(--olive);
 }
 
 .error,
 .note {
   padding: 10px 14px;
   margin-bottom: 12px;
-  border-radius: 6px;
+  border-radius: 10px;
 }
 
 .error {
@@ -221,13 +306,15 @@ button:disabled {
 canvas {
   display: block;
   width: 100%;
-  height: 230px;
-  margin-bottom: 16px;
+  height: 240px;
+  margin: 6px 0 18px;
 }
 
 .table-title {
-  margin: 16px 0 6px;
-  font-size: 0.95rem;
+  margin: 18px 0 8px;
+  font-family: var(--serif);
+  font-size: 1.05rem;
+  font-weight: 600;
 }
 
 table {
@@ -238,17 +325,25 @@ table {
 
 th,
 td {
-  padding: 7px 10px;
+  padding: 8px 12px;
   text-align: left;
-  border-bottom: 1px solid var(--border);
 }
 
 th {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom: 2px solid var(--border);
+}
+
+tbody tr:nth-child(even) {
   background: var(--background);
 }
 
 td:last-child,
 th:last-child {
   text-align: right;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: lining-nums tabular-nums;
 }

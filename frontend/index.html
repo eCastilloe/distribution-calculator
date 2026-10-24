@@ -13,34 +13,39 @@
   </header>
 
   <main>
-    <section class="card">
+    <section class="card input-card">
       <h2>1. Datos del problema</h2>
 
-      <div class="choice" role="radiogroup" aria-label="Distribución">
-        <label class="choice-option">
-          <input type="radio" name="distribution" value="z" checked>
-          <span>Z <small>Normal</small></span>
-        </label>
-        <label class="choice-option">
-          <input type="radio" name="distribution" value="t">
-          <span>t <small>Student</small></span>
-        </label>
-        <label class="choice-option">
-          <input type="radio" name="distribution" value="chi2">
-          <span>χ² <small>Chi cuadrada</small></span>
-        </label>
-        <label class="choice-option">
-          <input type="radio" name="distribution" value="f">
-          <span>F <small>Fisher</small></span>
-        </label>
+      <div class="setup">
+        <div>
+          <div class="choice" role="radiogroup" aria-label="Distribución">
+            <label class="choice-option">
+              <input type="radio" name="distribution" value="z" checked>
+              <span>Z <small>Normal</small></span>
+            </label>
+            <label class="choice-option">
+              <input type="radio" name="distribution" value="t">
+              <span>t <small>Student</small></span>
+            </label>
+            <label class="choice-option">
+              <input type="radio" name="distribution" value="chi2">
+              <span>χ² <small>Chi cuadrada</small></span>
+            </label>
+            <label class="choice-option">
+              <input type="radio" name="distribution" value="f">
+              <span>F <small>Fisher</small></span>
+            </label>
+          </div>
+          <p id="distribution-hint" class="hint"></p>
+        </div>
+        <div>
+          <label class="field">
+            <span>¿Qué quieres calcular?</span>
+            <select id="problem"></select>
+          </label>
+          <p id="problem-hint" class="hint"></p>
+        </div>
       </div>
-      <p id="distribution-hint" class="hint"></p>
-
-      <label class="field">
-        <span>¿Qué quieres calcular?</span>
-        <select id="problem"></select>
-      </label>
-      <p id="problem-hint" class="hint"></p>
 
       <form id="form" novalidate>
         <div id="fields"></div>
@@ -48,7 +53,7 @@
       </form>
     </section>
 
-    <section class="card">
+    <section class="card result-card">
       <h2>2. Resultado</h2>
       <div id="result">
         <p class="placeholder">Aquí aparecerá la respuesta, la gráfica y las tablas.</p>
@@ -56,6 +61,8 @@
     </section>
   </main>
 
+  <script src="forms.js"></script>
+  <script src="chart.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

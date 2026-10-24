@@ -51,9 +51,19 @@ En las comparaciones de dos poblaciones se agrega el criterio de decisión del f
     server.py            Servidor y API (POST /api/calculate, GET /health)
     desktop.py           Arranque local: abre el navegador solo (se usa para el ejecutable)
     build_exe.bat / .sh  Generan el ejecutable con PyInstaller
-    problems.py          Validación de datos y cálculo de cada tipo de problema
-    distributions.py     Curvas Z, t, χ² y F; área bajo la curva, probabilidad y valores críticos
-    frontend/            Interfaz (index.html, style.css, app.js)
+    problems.py          Índice: qué función resuelve cada problema de cada distribución
+    intervals.py         Intervalos de confianza del formulario y tamaño de muestra
+    probability.py       Probabilidad (menor, mayor o entre dos valores)
+    inputs.py            Lectura y validación de los datos (números, listas, muestras)
+    results.py           Tabla de valores, interpretación y conclusiones (H₀ y H₁)
+    charts.py            Datos de la gráfica (curva, eje, marcas)
+    distributions.py     Curvas Z, t, χ² y F; área bajo la curva y valores críticos
+    frontend/
+      index.html         Página
+      style.css          Colores y diseño
+      forms.js           Campos que pide cada problema
+      chart.js           Dibujo de la gráfica
+      app.js             Lógica de la página: muestra campos, envía datos y muestra el resultado
     tests/               Pruebas automáticas (python -m unittest discover tests)
     render.yaml          Configuración para publicar en Render
 

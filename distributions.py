@@ -40,7 +40,6 @@ def f_curve(df1, df2):
 
 
 def area_under(curve, start, end):
-    # Regla de Simpson: STEPS tiras (debe ser par) que se suman con pesos 1, 4, 2, 4...
     width = (end - start) / STEPS
     total = curve(start) + curve(end)
     for i in range(1, STEPS):
