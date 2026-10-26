@@ -4,5 +4,5 @@ services:
     runtime: python
     plan: free
     healthCheckPath: /health
-    buildCommand: pip install -r requirements.txt
-    startCommand: python server.py
+    buildCommand: echo "Sin dependencias: solo usa la biblioteca estándar de Python"
+    startCommand: python backend/server.py

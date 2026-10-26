@@ -4,16 +4,16 @@ Programa con interfaz web y backend en Python. No usa librerías externas: solo 
 
 ## Cómo ejecutarlo en tu computadora
 
-    python server.py
+    python backend/server.py
 
-Después abre http://localhost:8000 en el navegador. Requiere Python 3.8 o superior.
+Desde la carpeta del proyecto. Después abre http://localhost:8000 en el navegador. Requiere Python 3.8 o superior.
 
 ## Crear un ejecutable (doble clic, sin instalar Python)
 
 El ejecutable se debe generar en el mismo sistema operativo donde se va a usar. Necesita Python solo para crearlo.
 
-- **Windows:** haz doble clic en `build_exe.bat`. Al terminar, el programa queda en `dist\CalculadoraDistribuciones.exe`.
-- **Mac o Linux:** ejecuta `sh build_exe.sh`. El programa queda en `dist/CalculadoraDistribuciones`.
+- **Windows:** haz doble clic en `ejecutable\build_exe.bat`. Al terminar, el programa queda en `ejecutable\dist\CalculadoraDistribuciones.exe`.
+- **Mac o Linux:** ejecuta `sh ejecutable/build_exe.sh`. El programa queda en `ejecutable/dist/CalculadoraDistribuciones`.
 
 Al abrirlo se muestra una ventana de texto y se abre el navegador con la calculadora. Para cerrar el programa, cierra esa ventana. Usa un puerto libre automáticamente, así que se puede abrir aunque otro programa ocupe el 8000.
 
@@ -41,31 +41,22 @@ Cómo se capturan los datos:
 Cada resultado incluye:
 - la respuesta;
 - una interpretación corta en palabras;
-- la gráfica de la curva con el área correspondiente;
 - una tabla con los valores del cálculo.
 
 En las comparaciones de dos poblaciones se agrega el criterio de decisión del formulario (por ejemplo, si las varianzas son significativamente diferentes).
 
 ## Estructura
 
-    server.py            Servidor y API (POST /api/calculate, GET /health)
-    desktop.py           Arranque local: abre el navegador solo (se usa para el ejecutable)
-    build_exe.bat / .sh  Generan el ejecutable con PyInstaller
-    problems.py          Índice: qué función resuelve cada problema de cada distribución
-    intervals.py         Intervalos de confianza del formulario y tamaño de muestra
-    probability.py       Probabilidad (menor, mayor o entre dos valores)
-    inputs.py            Lectura y validación de los datos (números, listas, muestras)
-    results.py           Tabla de valores, interpretación y conclusiones (H₀ y H₁)
-    charts.py            Datos de la gráfica (curva, eje, marcas)
-    distributions.py     Curvas Z, t, χ² y F; área bajo la curva y valores críticos
+    backend/
+      server.py          Servidor y API (POST /api/calculate, GET /health)
+      calculator.py      Lectura de datos, intervalos, probabilidad, interpretación e índice de problemas
+      distributions.py   Curvas Z, t, χ² y F; área bajo la curva y valores críticos
+      desktop.py         Arranque local: abre el navegador solo (se usa para el ejecutable)
     frontend/
-      index.html         Página
-      style.css          Colores y diseño
-      forms.js           Campos que pide cada problema
-      chart.js           Dibujo de la gráfica
-      app.js             Lógica de la página: muestra campos, envía datos y muestra el resultado
-    tests/               Pruebas automáticas (python -m unittest discover tests)
-    render.yaml          Configuración para publicar en Render
+      index.html         Página completa: diseño (<style>), campos de cada problema y lógica (<script>)
+    ejecutable/
+      build_exe.bat/.sh  Generan el ejecutable con PyInstaller (queda en ejecutable/dist)
+    render.yaml          Configuración para publicar en Render (start: python backend/server.py)
 
 ## Método
 

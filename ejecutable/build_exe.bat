@@ -1,5 +1,6 @@
 @echo off
-cd /d "%~dp0"
+rem Se trabaja desde la carpeta del proyecto (la de arriba de "ejecutable")
+cd /d "%~dp0.."
 
 set PYTHON_CMD=
 where py >nul 2>nul && set PYTHON_CMD=py
@@ -17,14 +18,15 @@ echo Usando: %PYTHON_CMD%
 %PYTHON_CMD% -m pip install pyinstaller
 if errorlevel 1 goto failed
 
-%PYTHON_CMD% -m PyInstaller --onefile --name CalculadoraDistribuciones --add-data "frontend;frontend" desktop.py
+rem El .exe y los archivos de trabajo de PyInstaller quedan dentro de "ejecutable"
+%PYTHON_CMD% -m PyInstaller --onefile --name CalculadoraDistribuciones --distpath ejecutable\dist --workpath ejecutable\build --specpath ejecutable --add-data "%CD%\frontend;frontend" "%CD%\backend\desktop.py"
 if errorlevel 1 goto failed
 
-if not exist "dist\CalculadoraDistribuciones.exe" goto failed
+if not exist "ejecutable\dist\CalculadoraDistribuciones.exe" goto failed
 
 echo.
-echo Listo. El ejecutable esta en la carpeta "dist" junto a este archivo.
-explorer "dist"
+echo Listo. El ejecutable esta en la carpeta "dist", junto a este archivo.
+explorer "ejecutable\dist"
 pause
 exit /b 0
 

@@ -4,17 +4,14 @@ import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from problems import solve
+from calculator import solve
 
-BASE_FOLDER = Path(getattr(sys, "_MEIPASS", Path(__file__).parent))
-FRONTEND = (BASE_FOLDER / "frontend").resolve()
+# La página está en frontend/, una carpeta arriba de backend/.
+# Cuando corre como .exe, PyInstaller deja los archivos en sys._MEIPASS
+PROJECT_FOLDER = Path(getattr(sys, "_MEIPASS", Path(__file__).parent.parent))
+PAGE = PROJECT_FOLDER / "frontend" / "index.html"
 MAX_BODY_BYTES = 10_000
 INVALID_DATA = "Los datos enviados no son válidos."
-CONTENT_TYPES = {
-    ".html": "text/html; charset=utf-8",
-    ".css": "text/css; charset=utf-8",
-    ".js": "application/javascript; charset=utf-8",
-}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -30,16 +27,13 @@ class Handler(BaseHTTPRequestHandler):
         self.send_body(status, "application/json; charset=utf-8", body)
 
     def do_GET(self):
-        if self.path == "/health":
+        path = self.path.split("?")[0]
+        if path == "/health":
             self.send_body(200, "text/plain; charset=utf-8", b"ok")
-            return
-        name = self.path.split("?")[0].lstrip("/") or "index.html"
-        file = (FRONTEND / name).resolve()
-        if file.parent != FRONTEND or not file.is_file():
+        elif path in ("/", "/index.html"):
+            self.send_body(200, "text/html; charset=utf-8", PAGE.read_bytes())
+        else:
             self.send_json(404, {"error": "Página no encontrada."})
-            return
-        content_type = CONTENT_TYPES.get(file.suffix, "application/octet-stream")
-        self.send_body(200, content_type, file.read_bytes())
 
     def read_body(self):
         try:
